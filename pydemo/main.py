@@ -138,12 +138,7 @@ class Order:
         self.receiver_address = receiver_address
         self.package_id = package_id
         self.status = OrderState.PLACED
-        self.status_times = {
-            OrderState.PLACED: datetime.now(),
-            OrderState.RECEIVED: None,
-            OrderState.COMPLETED: None,
-            OrderState.CANCELED: None
-        }
+        self.history =[[OrderState.PLACED,datetime.now()]]
     def to_dict(self):
         return {
             'order_id': self.order_id,
@@ -629,6 +624,7 @@ def update_delivery_status(delivery_id):
 
     return jsonify({'success': False, 'message': '配送任务未找到'}), 404
 # 通知系统（示例）
+
 @app.route('/notify/<username>', methods=['POST'])
 def notify_after_login(username):
     """
@@ -637,6 +633,7 @@ def notify_after_login(username):
     tags: [通知系统]
     parameters:
       - in: path
+        name: username
         required: true
         type: string
     responses:
@@ -644,7 +641,7 @@ def notify_after_login(username):
     """
     if not username:
         return jsonify({'success': False, 'message': '缺少用户名'}), 400
-
+    print(111)
     # 获取用户信息
     user_data = users.get(username)
     if not user_data:
@@ -668,25 +665,29 @@ def notify_after_login(username):
     else:
         return jsonify({'success': False, 'message': '未知的用户角色'}), 400
 def get_user_order_status(username):
-    pass
+    today = datetime.now().date()
+    placed = sum(1 for order in orders.values() if order['status'] == 'placed' and order['receiver_name'] == username)
+    received_today = sum(1 for order in orders.values() if order['status'] == 'received' and order['receiver_name'] == username and datetime.strptime(order['date_received'], '%Y-%m-%d').date() == today)
+    completed_today = sum(1 for order in orders.values() if order['status'] == 'completed' and order['receiver_name'] == username and datetime.strptime(order['date_completed'], '%Y-%m-%d').date() == today)
+    return {
+        'placed': placed,
+        'received_today': received_today,
+        'completed_today': completed_today
+    }
 def get_courier_task_status(username):
-    pass
-@app.route('/notify/delivery/<delivery_id>', methods=['POST'])
-def notify_delivery_status(delivery_id):
-    """
-    通知配送状态
-    ---
-    tags: [通知系统]
-    parameters:
-      - in: path
-        name: delivery_id
-        required: true
-        type: string
-    responses:
-      200: {description: 通知发送成功}
-    """
-    # 这里可以实现通知逻辑，例如通过短信或邮件通知配送员
-    return jsonify({'success': True, 'message': f'配送任务 {delivery_id} 的通知已发送'}), 200
+    today = datetime.now().date()
+    if username in cached_tasks and cached_tasks[username]['date'] == today:
+        pending_tasks = len([task for task in cached_tasks[username]['total_path'] if deliveries[task]['status'] != 'delivered'])
+        return {
+            'assigned_today': True,
+            'pending_tasks': pending_tasks
+        }
+    else:
+        return {
+            'assigned_today': False,
+            'pending_tasks': 0
+        }
+
 # 统计和报告（示例）
 @app.route('/report/packages', methods=['GET'])
 def report_packages():

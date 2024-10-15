@@ -9,19 +9,19 @@ import itertools
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 
-# 生成随机经纬度坐标点
-def generate_random_coordinates(n, lat_range=(0, 10000), lon_range=(0, 10000)):
-    lats = np.random.uniform(lat_range[0], lat_range[1], n)
-    lons = np.random.uniform(lon_range[0], lon_range[1], n)
-    return np.column_stack((lats, lons))
+# # 生成随机经纬度坐标点
+# def generate_random_coordinates(n, lat_range=(0, 10000), lon_range=(0, 10000)):
+#     lats = np.random.uniform(lat_range[0], lat_range[1], n)
+#     lons = np.random.uniform(lon_range[0], lon_range[1], n)
+#     return np.column_stack((lats, lons))
 
-#K-means聚类
-def kmeans_clustering(coordinates, n_clusters):
-    kmeans = KMeans(n_clusters=n_clusters,random_state=42)
-    kmeans.fit(coordinates)
-    labels = kmeans.labels_
-    cluster_centers = kmeans.cluster_centers_
-    return labels, cluster_centers
+# #K-means聚类
+# def kmeans_clustering(coordinates, n_clusters):
+#     kmeans = KMeans(n_clusters=n_clusters,random_state=42)
+#     kmeans.fit(coordinates)
+#     labels = kmeans.labels_
+#     cluster_centers = kmeans.cluster_centers_
+#     return labels, cluster_centers
 # hierarchical聚类
 
 def hierarchical_clustering(coordinates, n_clusters):
