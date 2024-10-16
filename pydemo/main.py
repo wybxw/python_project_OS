@@ -461,7 +461,7 @@ def assign_delivery(user_id):
           type: object
           required: [user_id]
     responses:
-      201: {description: 配送任务分配成功}
+      201: {description: 配送任务分配成功} 
       400: {description: 配送任务已存在}
     """
     today = datetime.now().date()
@@ -656,12 +656,13 @@ def notify_after_login(username):
     # 根据用户角色返回不同的响应
     if user.role == 'user':
         # 获取用户订单状态
-        order_status = get_user_order_status(username)
-        return jsonify({'success': True, 'message': f'已发送', 'order_status': order_status}), 200
+        order_notification = get_user_order_status(username)
+
+        return jsonify({'success': True, 'message': '已发送', 'notification': order_notification}), 200
     elif user.role == 'courier':
         # 获取快递员任务状态
-        task_status = get_courier_task_status(username)
-        return jsonify({'success': True, 'message': f'已发送', 'task_status': task_status}), 200
+        task_notification = get_courier_task_status(username)
+        return jsonify({'success': True, 'message': '已发送', 'notification': task_notification}), 200
     else:
         return jsonify({'success': False, 'message': '未知的用户角色'}), 400
 def get_user_order_status(username):
@@ -669,24 +670,15 @@ def get_user_order_status(username):
     placed = sum(1 for order in orders.values() if order['status'] == 'placed' and order['receiver_name'] == username)
     received_today = sum(1 for order in orders.values() if order['status'] == 'received' and order['receiver_name'] == username and datetime.strptime(order['date_received'], '%Y-%m-%d').date() == today)
     completed_today = sum(1 for order in orders.values() if order['status'] == 'completed' and order['receiver_name'] == username and datetime.strptime(order['date_completed'], '%Y-%m-%d').date() == today)
-    return {
-        'placed': placed,
-        'received_today': received_today,
-        'completed_today': completed_today
-    }
+    return f'仍处于已下单状态订单{placed}个,今天已有{received_today}个订单接入本配送中心,今天已完成{completed_today}个订单'
+    
 def get_courier_task_status(username):
     today = datetime.now().date()
     if username in cached_tasks and cached_tasks[username]['date'] == today:
         pending_tasks = len([task for task in cached_tasks[username]['total_path'] if deliveries[task]['status'] != 'delivered'])
-        return {
-            'assigned_today': True,
-            'pending_tasks': pending_tasks
-        }
+        return  f'今日还有{pending_tasks}个配送任务待完成'
     else:
-        return {
-            'assigned_today': False,
-            'pending_tasks': 0
-        }
+        return  f'今日还未签到,请领取任务'
 
 # 统计和报告（示例）
 @app.route('/report/packages', methods=['GET'])
