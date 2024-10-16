@@ -1,16 +1,1 @@
-{
-    "666": {
-        "package_id": "666",
-        "sender": "1",
-        "receiver": "1",
-        "status": "uncounted",
-        "created_at": "2024-10-15T21:33:11.775832",
-        "completed_at": null,
-        "history": [
-            [
-                "uncounted",
-                "2024-10-15T21:33:11.775832"
-            ]
-        ]
-    }
-}
+{}

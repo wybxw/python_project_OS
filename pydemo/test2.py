@@ -271,12 +271,12 @@ def GET_task_path(coordinates):
         clusters_path = []
         for index, cluster in enumerate(tsp_path_dp):
             cluster_points = clusters[cluster]
-            
+            print(cluster_points)
             # 检查聚类中的点数
             if len(cluster_points) == 0:
                 continue  # 跳过没有点的聚类
             elif len(cluster_points) == 1:
-                tsp_path = [0]  # 只有一个点，路径就是该点本身
+                tsp_path = [list(cluster_points.keys())[0]]  # 只有一个点，路径就是该点本身
             else:
                 cluster_distance_matrix = calculate_distance_matrix_map(cluster_points)
                 tsp_path = solve_tsp_or_tools(cluster_distance_matrix)
@@ -394,7 +394,6 @@ def GET_task_path(coordinates):
 #     )
 #     orders.append(order)
 
-# GET_task_path([[1,2],[3,4]])
         
         
     

@@ -1,16 +1,26 @@
 {
     "1": {
         "username": "1",
-        "password": "1",
+        "password": "woshiwuyou8",
         "address": "1",
-        "contact": "111111",
-        "role": "user"
+        "contact": "1",
+        "role": "user",
+        "online": true
     },
     "2": {
         "username": "2",
         "password": "2",
         "address": "2",
         "contact": "2",
-        "role": "courier"
+        "role": "user",
+        "online": false
+    },
+    "4": {
+        "username": "4",
+        "password": "3",
+        "address": "1",
+        "contact": "2",
+        "role": "user",
+        "online": true
     }
 }
