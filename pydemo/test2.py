@@ -9,19 +9,7 @@ import itertools
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 
-# # 生成随机经纬度坐标点
-# def generate_random_coordinates(n, lat_range=(0, 10000), lon_range=(0, 10000)):
-#     lats = np.random.uniform(lat_range[0], lat_range[1], n)
-#     lons = np.random.uniform(lon_range[0], lon_range[1], n)
-#     return np.column_stack((lats, lons))
 
-# #K-means聚类
-# def kmeans_clustering(coordinates, n_clusters):
-#     kmeans = KMeans(n_clusters=n_clusters,random_state=42)
-#     kmeans.fit(coordinates)
-#     labels = kmeans.labels_
-#     cluster_centers = kmeans.cluster_centers_
-#     return labels, cluster_centers
 # hierarchical聚类
 
 def hierarchical_clustering(coordinates, n_clusters):
@@ -29,7 +17,6 @@ def hierarchical_clustering(coordinates, n_clusters):
     labels = hierarchical.fit_predict(coordinates)
     cluster_centers = np.array([coordinates[labels == i].mean(axis=0) for i in range(n_clusters)])
     return labels, cluster_centers
-# 可视化聚类结果
 
 def create_graph(distance_matrix):
     """Creates a graph from the distance matrix."""
@@ -39,13 +26,6 @@ def create_graph(distance_matrix):
             G.add_edge(u, v, weight=distance_matrix[u][v])
     return G
 
-# def solve_tsp_networkx(distance_matrix):
-#     """Solves the TSP problem using networkx."""
-#     G = create_graph(distance_matrix)
-#     tsp_path = nx.approximation.traveling_salesman_problem(G, cycle=True)
-#     # 计算路径长度
-#     tsp_length = sum(distance_matrix[u][v] for u, v in zip(tsp_path, tsp_path[1:] + [tsp_path[0]]))
-#     return tsp_length, tsp_path
 def solve_tsp_networkx(distance_matrix):
     G = create_graph(distance_matrix)
     tsp_path = nx.approximation.traveling_salesman_problem(G, cycle=False)
@@ -142,7 +122,7 @@ def create_distance_callback(distance_matrix, manager,ratio,original_nodes):
         return int(ratio)*int(distance_matrix[original_nodes[from_node]][original_nodes[to_node]])
     return distance_callback
 
-def solve_tsp_or_tools(distance_matrix):
+def solve_tsp_or_tools(distance_matrix,time_limit=0):
     """Solves the TSP problem using Google OR-Tools."""
     # 获取原始节点标号
     original_nodes = list(distance_matrix.keys())
@@ -150,6 +130,7 @@ def solve_tsp_or_tools(distance_matrix):
     ratio = 1000000#放大系数 ,因为or-tools只支持整数
 
     manager = pywrapcp.RoutingIndexManager(num_nodes, 1, 0)
+    manager.num_search_workers = 16
     routing = pywrapcp.RoutingModel(manager)
     distance_callback = create_distance_callback(distance_matrix, manager,ratio,original_nodes)
     transit_callback_index = routing.RegisterTransitCallback(distance_callback)
@@ -157,8 +138,13 @@ def solve_tsp_or_tools(distance_matrix):
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
     search_parameters.first_solution_strategy = (
         routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
+    #search_parameters.local_search_metaheuristic = (
+    #    routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH)
+    search_parameters.use_cp_sat=True
+    if time_limit > 0:
+        search_parameters.time_limit.seconds = int(time_limit)
+        search_parameters.time_limit.nanos = int((time_limit-int(time_limit))*1000000000)
     solution = routing.SolveWithParameters(search_parameters)
-    
     # Get the solution path and length.
     if solution:
         index = routing.Start(0)
@@ -236,35 +222,10 @@ def plot_paths(coordinates, path1, path2):
 
 # 主函数
 def GET_task_path(coordinates):
-    # 生成包含 100 个节点的随机经纬度坐标点
-    #n = len(orders)
     coordinates = np.array(coordinates)
-    #print(coordinates)
     # 计算距离矩阵
     distance_matrix = calculate_distance_matrix_list(coordinates)    
-    # 对每个聚类内部使用 networkx 的 TSP 算法
-    # def get_result_dpnx(tsp_path_dp):
-    #     start_time = time.time()
-    #     total_path_dpnx = []
-    #     for index, cluster in enumerate(tsp_path_dp):
-    #         cluster_points = clusters[cluster]
-    #         cluster_distance_matrix = calculate_distance_matrix_map(cluster_points)
-    #         tsp_path = solve_tsp_networkx(cluster_distance_matrix)
 
-    #         if total_path_dpnx:
-    #             last_point = total_path_dpnx[-1]
-    #             min_distance = float('inf')
-    #             min_index = 0
-    #             for i, point in enumerate(tsp_path):
-    #                 distance = distance_matrix[last_point][point]
-    #                 if distance < min_distance:
-    #                     min_distance = distance
-    #                     min_index = i
-    #             tsp_path = tsp_path[min_index:] + tsp_path[:min_index]
-    #         print(tsp_path)
-    #         total_path_dpnx += tsp_path
-    #     end_time = time.time()
-    #     return total_path_dpnx,end_time-start_time
     def get_result_dpot(tsp_path_dp):
         start_time = time.time()
         total_path_dpot = []
@@ -300,103 +261,27 @@ def GET_task_path(coordinates):
         return total_path_dpot, end_time - start_time, clusters_path, clusters_length
     
     
-    n_clusters_list = []
-    kmeans_times = []
-    dpot_times = []
-    dpot_lengths = []
-    
-    n_clusters=min(10,len(coordinates))
-    print(n_clusters)
-    start_time = time.time()
+    if len(coordinates) <100:
+        ortools_path=solve_tsp_or_tools({index: value for index, value in enumerate(distance_matrix)},10)
+        #print(ortools_path)
+        ortools_length=sum(distance_matrix[ortools_path[i]][ortools_path[i + 1]] for i in range(0,len(ortools_path)-1))
+        return ortools_path,ortools_length,[],[]
+
+
+    n_clusters=min(2,len(coordinates))
     labels, cluster_centers = hierarchical_clustering(coordinates, n_clusters)
     
     # 获取每个聚类的点集
     clusters = {}
     for cluster_id in range(n_clusters):
         clusters[cluster_id] = {index: coordinates[index] for index in range(len(coordinates)) if labels[index] == cluster_id}
-
     # 计算聚类中心之间的距离矩阵
     cluster_distance_matrix = calculate_distance_matrix_list(cluster_centers)
-
     # 使用动态规划解决聚类中心的 TSP 问题
     
     tsp_length_dp, tsp_path_dp = solve_tsp_dynamic_programming(cluster_distance_matrix)
-    end_time = time.time()
-    
-    hierarchical_time=end_time-start_time
-    #print(f"聚类方式: hierarchical")
-    #print(f"聚类数量: {n_clusters}")
-    #print(f"聚类时间与动态规划耗时: {hierarchical_time}")
+
     total_path_dpot,dpot_time,clusters_path,clusters_length=get_result_dpot(tsp_path_dp)
-    #total_path_dpnx,dpnx_time=get_result_dpnx(tsp_path_dp)
-    
-    #print(total_path_dpnx)
-    #print(clusters_path)
-    #print(clusters_length)
 
-    #根据total_path来计算total_length
-    #total_length_dpnx=sum(distance_matrix[total_path_dpnx[i]][total_path_dpnx[i + 1]] for i in range(0,n-1))
-    total_length_dpot=sum(distance_matrix[total_path_dpot[i]][total_path_dpot[i + 1]] for i in range(0,len(total_path_dpot)-1))
-    ##print(f"聚类和动态规划+NetworkX 最短路径长度: {total_length_dpnx}")
-    ##print(f"聚类和动态规划+NetworkX 最优路径: {total_path_dpnx}")
-    ##print(f"聚类和动态规划+NetworkX 运行时间: {dpnx_time+kmeans_time:.5f} 秒")
-    #print(f"聚类和动态规划+OR-tools 最短路径长度: {total_length_dpot}")
-    #print(f"聚类和动态规划+OR-tools 最优路径: {total_path_dpot}")
-    #print(f"聚类和动态规划+OR-tools 运行时间: {dpot_time+hierarchical_time:.5f} 秒")
-    n_clusters_list.append(n_clusters)
-    kmeans_times.append(hierarchical_time)
-    #dpnx_times.append(dpnx_time + kmeans_time)
-    dpot_times.append(dpot_time + hierarchical_time)
-    #dpnx_lengths.append(total_length_dpnx)  # 保存NetworkX的最短路径长度
-    dpot_lengths.append(total_length_dpot)   # 保存OR-tools的最短路径长度
-    
-    #plot_paths(coordinates, total_path_dpot, total_path_dpot)
+    total_length_dpot=sum(distance_matrix[total_path_dpot[i]][total_path_dpot[i + 1]] for i in range(0,len(total_path_dpot)-1))    
     return total_path_dpot,total_length_dpot,clusters_path,clusters_length
-    # # 绘制运行时间的折线
-    # plt.subplot(2, 1, 1)
-    # plt.plot(n_clusters_list, kmeans_times, marker='o', label='K-means耗时')
-    # plt.plot(n_clusters_list, dpnx_times, marker='o', label='动态规划+NetworkX耗时')
-    # plt.plot(n_clusters_list, dpot_times, marker='o', label='动态规划+OR-tools耗时')
-    # plt.title('不同聚类数下的运行时间')
-    # plt.xlabel('聚类数量')
-    # plt.ylabel('运行时间 (秒)')
-    # plt.xticks(n_clusters_list)  # 设置x轴刻度
-    # plt.legend()
-    # plt.grid(True)
-
-    # # 绘制最短路径长度的折线
-    # plt.subplot(2, 1, 2)
-    # plt.plot(n_clusters_list, dpnx_lengths, marker='o', label='动态规划+NetworkX最短路径长度')
-    # plt.plot(n_clusters_list, dpot_lengths, marker='o', label='动态规划+OR-tools最短路径长度')
-    # plt.title('不同聚类数下的最短路径长度')
-    # plt.xlabel('聚类数量')
-    # plt.ylabel('最短路径长度')
-    # plt.xticks(n_clusters_list)  # 设置x轴刻度
-    # plt.legend()
-    # plt.grid(True)
-
-    # #绘制两种路径的路线图
-    # plt.figure(figsize=(12, 6))
-    # plt.tight_layout()  # 自动调整子图参数
-    # plt.show()
-
-# orders = []
-# for i in range(100):  # 生成10个订单
-#     order = Order(
-#         order_id=i,
-#         sender_id=1,
-#         receiver_id=1,
-#         sender_address=[1,1],
-#         receiver_address=[np.random.uniform(0,10000),np.random.uniform(0,10000)],
-#         package_id=1
-#     )
-#     orders.append(order)
-
-        
-        
-    
-    
-    
-    
-    
-    

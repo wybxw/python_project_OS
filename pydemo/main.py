@@ -10,9 +10,11 @@ import json
 from jsonpath_ng import jsonpath, parse
 from enum import Enum
 import os
-from test2 import GET_task_path
+from test2 import GET_task_pathz
 import numpy as np
 import logging
+import signal
+import time
 app = Flask(__name__)
 swagger = Swagger(app)
 logging.basicConfig(level=logging.INFO)
@@ -25,7 +27,8 @@ def load_json(path):
         return {}
     with open(file_path, 'r') as file:
         return json.load(file)
-# 模拟数据库
+
+
 user_lock = rwlock.RWLockFairD()  #用户读写锁
 users = {}# 用户数据 json
 
@@ -47,7 +50,7 @@ def save_json(path, data):
     # 将所有 Order 对象转换为字典格式
     serializable_data = {k: (v.to_dict() if hasattr(v, 'to_dict') else v) for k, v in data.items()}
     try:
-        with open(file_path, 'w') as file:  # 使用 'w' 模式打开文件，确保覆写文件内容
+        with open(file_path, 'w') as file:  # 覆写文件内容
             json.dump(serializable_data, file, indent=4)
         logger.info(f"Saved JSON data to {file_path}")
     except Exception as e:
@@ -59,6 +62,11 @@ def save_data():
     save_json('packages',packages)
     save_json('users',users)
     print("数据已保存")
+
+def save_data_daemon():
+    while 1:
+        save_data()
+        time.sleep(300)
 
 # 注册退出时执行的操作
 atexit.register(save_data)
@@ -194,14 +202,14 @@ def Create_Delivery(delivery_id,package_id,courier_id):
         deliveries[delivery_id] = delivery.to_dict()
     finally:
         lock.release()
-def Create_Order(order_id, sender_name, receiver_name, sender_address, receiver_address, package_id,priority=0):
+def Create_Order(order_id, sender_name, receiver_name, sender_address, receiver_address,priority=0):
     lock = orders_lock.gen_wlock()
     if not lock.acquire(timeout=5):
         raise TimeoutError("获取写锁超时")
     try:
         if order_id in orders:
             return {'success': False, 'message': '订单已存在'}, 400
-        order = Order(order_id, sender_name, receiver_name, sender_address, receiver_address, package_id,priority)
+        order = Order(order_id, sender_name, receiver_name, sender_address, receiver_address,order_id,priority,status=OrderState.RECEIVED)
         orders[order_id] = order.to_dict()
         return {'success': True, 'message': '订单创建成功'}, 201
     finally:
@@ -557,14 +565,13 @@ def create_order():
         required: true
         schema:
           type: object
-          required: [order_id, sender_name, receiver_name, sender_address, receiver_address, package_id]
+          required: [order_id, sender_name, receiver_name, sender_address, receiver_address]
           properties:
             order_id: {type: string}
             sender_name: {type: string}
             receiver_name: {type: string}
             sender_address: {type: string}
             receiver_address: {type: string}
-            package_id: {type: string}
             priority: {type: integer}
     responses:
       201: {description: 订单创建成功}
@@ -576,12 +583,12 @@ def create_order():
     receiver_name = data.get('receiver_name')
     sender_address = data.get('sender_address')
     receiver_address = data.get('receiver_address')
-    package_id = data.get('package_id')
+    package_id = data.get('order_id')
     priority = data.get('priority')
 
     if not order_id or not sender_name or not receiver_name or not sender_address or not receiver_address or not package_id:
         return jsonify({'success': False, 'message': '缺少必要的订单信息'}), 400
-    Create_Order(order_id, sender_name, receiver_name, sender_address, receiver_address, package_id,priority)
+    Create_Order(order_id, sender_name, receiver_name, sender_address, receiver_address,priority)
     
     return jsonify({'success': True, 'message': '订单创建成功'}), 201
 @app.route('/order/<order_id>', methods=['PUT'])
@@ -684,15 +691,15 @@ def assign_delivery(username):
         return jsonify({'success': False, 'message': '缺少快递员信息'}), 400
 
     # 检查是否已经生成过该快递员当天的任务
-    if username in cached_tasks and cached_tasks[username]['date'] == today:
-        return jsonify({
-            'success': True,
-            'message': '配送任务分配成功',
-            'path': cached_tasks[username]['total_path'],
-            'length': cached_tasks[username]['total_length'],
-            'clusters_path': cached_tasks[username]['clusters_path'],
-            'clusters_length': cached_tasks[username]['clusters_length']
-        }), 201
+    # if username in cached_tasks and cached_tasks[username]['date'] == today:
+    #     return jsonify({
+    #         'success': True,
+    #         'message': '配送任务分配成功',
+    #         'path': cached_tasks[username]['total_path'],
+    #         'length': cached_tasks[username]['total_length'],
+    #         'clusters_path': cached_tasks[username]['clusters_path'],
+    #         'clusters_length': cached_tasks[username]['clusters_length']
+    #     }), 201
     lock = orders_lock.gen_rlock()
     if not lock.acquire(timeout=5):
         return jsonify({'success': False, 'message': '获取读锁超时'}), 500
@@ -908,21 +915,19 @@ def report_deliveries():
     """
     # 这里可以实现配送效率统计逻辑
     return jsonify({'success': True, 'message': '配送效率统计生成成功'}), 200
+def handle_exit_signal(signum, frame):
+    app.logger.info("Received exit signal, saving data...")
+    save_data()
+    app.logger.info("Data saved successfully. Exiting...")
+    os._exit(0)
+# 注册信号处理函数
+signal.signal(signal.SIGTERM, handle_exit_signal)
 if __name__ == '__main__':
     users=load_json('users')
     packages=load_json('packages')
     deliveries=load_json('deliveries')
     orders=load_json('orders')
-    for i in range(20,40):  # 生成10个订单
-        order = Order(
-            order_id=i,
-            sender_name=1,
-            receiver_name=1,
-            sender_address=[1,1],
-            receiver_address=[np.random.uniform(0,10000),np.random.uniform(0,10000)],
-            package_id=1,
-            priority=0,
-            status=OrderState.RECEIVED
-        )
-        orders[str(i)]=order.to_dict()
-    app.run(host='0.0.0.0', port=12345)
+    task_thread=threading.Thread(target=save_data_daemon)
+    task_thread.daemon = True    
+    task_thread.start()
+    app.run(threaded=True,host='0.0.0.0', port=12345)

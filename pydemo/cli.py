@@ -4,8 +4,9 @@ import configparser
 import os
 import curses
 from Curse import view_tasks_curses
-
-API_URL = "http://localhost:12345"
+import uuid
+import numpy as np
+API_URL = "http://10.29.3.96:12345"
 CONFIG_FILE = "config.ini"
 
 def get_config():
@@ -41,8 +42,8 @@ def view_tasks():
         click.echo(f"任务获取失败: {response.json().get('error', '未知错误')}")
 
 @click.command()
-@click.option('-u', '--username', required=True, help='用户名')
-@click.option('-pwd', '--password', required=True, help='密码')
+@click.option('-用户名', '--username', required=True, help='用户名')
+@click.option('-密码', '--password', required=True, help='密码')
 def register(username, password):
     """注册新用户"""
     payload = {
@@ -56,9 +57,9 @@ def register(username, password):
         click.echo(f"注册失败: {response.json().get('error', '未知错误')}")
 
 @click.command()
-@click.option('-u', '--username', required=True, help='用户名')
-@click.option('-pwd', '--password', required=True, help='密码')
-@click.option('-c', '--contact', required=False, help='联系方式')
+@click.option('-用户名', '--username', required=True, help='用户名')
+@click.option('-密码', '--password', required=True, help='密码')
+@click.option('-手机号', '--contact', required=False, help='联系方式')
 def login(username, password, contact=''):
     """用户登录"""
     payload = {
@@ -78,10 +79,10 @@ def login(username, password, contact=''):
         response = requests.post(f"{API_URL}/notify/{username}")
         print(response.json().get('notification'))
     elif response.status_code == 401:
-        click.echo(f"登录失败: {response.json().get('error', '密码错误')}")
+        click.echo(f"登录失败")
 
 @click.command()
-@click.option('-r', '--role', type=click.Choice(['user', 'courier'], case_sensitive=False), required=True, help='用户身份')
+@click.option('-角色', '--role', type=click.Choice(['user', 'courier'], case_sensitive=False), required=True, help='用户身份')
 def set_role(role):
     """设置用户身份"""
     # 从配置文件中读取用户名
@@ -98,7 +99,7 @@ def set_role(role):
     if response.status_code == 200:
         click.echo("身份设置成功")
     else:
-        click.echo(f"身份设置失败: {response.json().get('error', '未知错误')}")
+        click.echo(f"身份设置失败")
 
 @click.command()
 def GetTasks():
@@ -115,7 +116,7 @@ def GetTasks():
         tasks = response.json()
         click.echo(f"任务获取成功: {tasks}")
     else:
-        click.echo(f"任务获取失败: {response.json().get('error', '未知错误')}")
+        click.echo(f"任务获取失败")
 
 @click.command()
 @click.argument('delivery_id')
@@ -125,7 +126,7 @@ def complete_delivery(delivery_id):
     if response.status_code == 200:
         click.echo("配送任务已完成")
     else:
-        click.echo(f"完成配送任务失败: {response.json().get('error', '未知错误')}")
+        click.echo(f"完成配送任务失败")
 
 @click.command()
 def logout():
@@ -139,8 +140,8 @@ def logout():
         click.echo("当前没有用户登录")
 
 @click.command()
-@click.option('-opwd', '--old_password', required=True, help='旧密码')
-@click.option('-npwd', '--new_password', required=True, help='新密码')
+@click.option('-旧密码', '--old_password', required=True, help='旧密码')
+@click.option('-新密码', '--new_password', required=True, help='新密码')
 def change_password(old_password, new_password):
     """修改密码"""
     config = get_config()
@@ -157,7 +158,7 @@ def change_password(old_password, new_password):
     if response.status_code == 200:
         click.echo("密码修改成功")
     else:
-        click.echo(f"密码修改失败: {response.json().get('error', '未知错误')}")
+        click.echo(f"密码修改失败")
 
 @click.command()
 @click.argument('order_id')
@@ -167,7 +168,35 @@ def sign_order(order_id):
     if response.status_code == 200:
         click.echo("订单已完成")
     else:
-        click.echo(f"完成订单失败: {response.json().get('error', '未知错误')}")
+        click.echo(f"完成订单失败")
+@click.command()
+@click.option('-发件人', '--sender_name', required=True, help='发件人姓名')
+@click.option('-收件人', '--receiver_name', required=True, help='收件人姓名')
+@click.option('-发件人地址', '--sender_address', required=True, help='发件人地址')
+@click.option('-收件人地址', '--receiver_address', required=True, help='收件人地址')
+@click.option('-优先级', '--priority', default=0, help='优先级')
+def create_order(sender_name, receiver_name, sender_address, receiver_address, priority):
+    """创建订单"""
+    #生成订单ID
+    order_id=str(uuid.uuid4())
+    #根据地址生成随机坐标
+    sender_address=np.random.uniform(1,100000,  2).tolist()
+    receiver_address=np.random.uniform(1, 100000, 2).tolist()
+    payload = {
+        "order_id": order_id,
+        "sender_name": sender_name,
+        "receiver_name": receiver_name,
+        "sender_address": sender_address,
+        "receiver_address": receiver_address,
+        "package_id": order_id,
+        "priority": priority
+    }
+    print(payload)
+    response = requests.post(f"{API_URL}/order", json=payload)
+    if response.status_code == 201:
+        click.echo("订单创建成功")
+    else:
+        click.echo(f"订单创建失败")
 
 cli.add_command(view_tasks)
 cli.add_command(GetTasks)
@@ -178,6 +207,6 @@ cli.add_command(complete_delivery)
 cli.add_command(logout)
 cli.add_command(change_password)
 cli.add_command(sign_order)
-
+cli.add_command(create_order)
 if __name__ == "__main__":
     cli()

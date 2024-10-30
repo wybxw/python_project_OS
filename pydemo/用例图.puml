@@ -1,0 +1,55 @@
+@startuml
+!define RECTANGLE class
+left to right direction
+
+actor 用户 as User
+actor 快递员 as Courier
+
+rectangle 系统 {
+    usecase "注册" as UC_Register
+    usecase "登录" as UC_Login
+    usecase "查看用户信息" as UC_ViewUserInfo
+    usecase "更新用户信息" as UC_UpdateUserInfo
+    usecase "创建订单" as UC_CreateOrder
+    usecase "查看订单信息" as UC_ViewOrderInfo
+    usecase "更新订单状态" as UC_UpdateOrderStatus
+    usecase "查看收件人所有订单" as UC_ViewReceiverOrders
+    usecase "创建包裹" as UC_CreatePackage
+    usecase "查看包裹状态" as UC_ViewPackageStatus
+    usecase "更新包裹状态" as UC_UpdatePackageStatus
+    usecase "分配配送任务" as UC_AssignDelivery
+    usecase "创建配送任务" as UC_CreateDelivery
+    usecase "查看配送状态" as UC_ViewDeliveryStatus
+    usecase "更新配送状态" as UC_UpdateDeliveryStatus
+    usecase "登录通知" as UC_NotifyAfterLogin
+    usecase "包裹数量统计" as UC_ReportPackages
+    usecase "配送效率统计" as UC_ReportDeliveries
+}
+
+User --> UC_Register
+User --> UC_Login
+User --> UC_ViewUserInfo
+User --> UC_UpdateUserInfo
+User --> UC_CreateOrder
+User --> UC_ViewOrderInfo
+User --> UC_UpdateOrderStatus
+User --> UC_ViewReceiverOrders
+User --> UC_CreatePackage
+User --> UC_ViewPackageStatus
+User --> UC_UpdatePackageStatus
+User --> UC_NotifyAfterLogin
+User --> UC_ReportPackages
+User --> UC_ReportDeliveries
+
+Courier --> UC_Login
+Courier --> UC_ViewUserInfo
+Courier --> UC_UpdateUserInfo
+Courier --> UC_AssignDelivery
+Courier --> UC_CreateDelivery
+Courier --> UC_ViewDeliveryStatus
+Courier --> UC_UpdateDeliveryStatus
+Courier --> UC_NotifyAfterLogin
+Courier --> UC_ReportPackages
+Courier --> UC_ReportDeliveries
+
+@enduml
